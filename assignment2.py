@@ -1,10 +1,6 @@
 #################################
-# Your name:
+# Your name: Galit Dotan
 #################################
-
-import numpy as np
-import matplotlib.pyplot as plt
-import intervals
 
 
 class Assignment2(object):
@@ -13,7 +9,7 @@ class Assignment2(object):
     Please use these function signatures for this assignment and submit this file, together with the intervals.py.
     """
 
-    def sample_from_D(self, m):
+    def sample_from_D(self, m:int):
         """Sample m data samples from D.
         Input: m - an integer, the size of the data sample.
 
@@ -21,8 +17,7 @@ class Assignment2(object):
                 A two dimensional array of size m that contains the pairs where drawn from the distribution P.
         """
         # TODO: Implement me
-        pass
-
+        return
 
     def experiment_m_range_erm(self, m_first, m_last, step, k, T):
         """Runs the ERM algorithm.
@@ -80,7 +75,6 @@ class Assignment2(object):
     #################################
     # Place for additional methods
 
-
     #################################
 
 
@@ -90,4 +84,3 @@ if __name__ == '__main__':
     ass.experiment_k_range_erm(1500, 1, 10, 1)
     ass.experiment_k_range_srm(1500, 1, 10, 1)
     ass.cross_validation(1500)
-
