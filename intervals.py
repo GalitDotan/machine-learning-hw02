@@ -1,14 +1,15 @@
 from numpy import *
+from numpy.typing import ArrayLike
 
 
-def find_best_interval(xs, ys, k):
+def find_best_interval(xs: ArrayLike, ys: ArrayLike, k: int) -> tuple[list[tuple[ndarray, ndarray]], ndarray]:
     assert all(array(xs) == array(sorted(xs))), "xs must be sorted!"
 
     xs = array(xs)
     ys = array(ys)
     m = len(xs)
     P = [[None for j in range(k + 1)] for i in range(m + 1)]
-    E = zeros((m + 1, k + 1), dtype=int)
+    E: ndarray = zeros((m + 1, k + 1), dtype=int)
 
     # Calculate the cumulative sum of ys, to be used later
     cy = concatenate([[0], cumsum(ys)])
@@ -19,7 +20,7 @@ def find_best_interval(xs, ys, k):
 
     # The minimal error of j intervals on 0 points - always 0. No update needed.        
 
-    # Fill middle
+    # Fill the middle
     for i in range(1, m + 1):
         for j in range(1, k + 1):
             # The minimal error of j intervals on the first i points:
@@ -35,7 +36,7 @@ def find_best_interval(xs, ys, k):
 
             E[i, j], P[i][j] = min(options)
 
-    # Extract best interval set and its error count
+    # Extract the best interval set and its error count
     best = []
     cur = P[m][k]
     for i in range(k, 0, -1):
@@ -44,7 +45,7 @@ def find_best_interval(xs, ys, k):
         if cur == None:
             break
     best = sorted(best)
-    besterror = E[m, k]
+    besterror: ndarray = E[m, k]
 
     # Convert interval boundaries to numbers in [0,1]
     exs = concatenate([[0], xs, [1]])
