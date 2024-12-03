@@ -34,7 +34,8 @@ def find_best_interval(xs: ArrayLike, ys: ArrayLike, k: int) -> tuple[list[tuple
                 min_error = argmin(next_errors)
                 options.append((next_errors[min_error], (l, arange(l, i + 1)[min_error])))
 
-            E[i, j], P[i][j] = min(options)
+            min_index = argmin(opt[0] for opt in options)
+            E[i, j], P[i][j] = options[min_index]
 
     # Extract the best interval set and its error count
     best = []
