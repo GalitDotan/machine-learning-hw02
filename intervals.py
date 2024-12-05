@@ -1,15 +1,14 @@
 from numpy import *
-from numpy.typing import ArrayLike
 
 
-def find_best_interval(xs: ArrayLike, ys: ArrayLike, k: int) -> tuple[list[tuple[ndarray, ndarray]], ndarray]:
+def find_best_interval(xs, ys, k):
     assert all(array(xs) == array(sorted(xs))), "xs must be sorted!"
 
     xs = array(xs)
     ys = array(ys)
     m = len(xs)
     P = [[None for j in range(k + 1)] for i in range(m + 1)]
-    E: ndarray = zeros((m + 1, k + 1), dtype=int)
+    E = zeros((m + 1, k + 1), dtype=int)
 
     # Calculate the cumulative sum of ys, to be used later
     cy = concatenate([[0], cumsum(ys)])
@@ -18,7 +17,7 @@ def find_best_interval(xs: ArrayLike, ys: ArrayLike, k: int) -> tuple[list[tuple
     # The error of no intervals, for the first i points
     E[:m + 1, 0] = cy
 
-    # The minimal error of j intervals on 0 points - always 0. No update needed.        
+    # The minimal error of j intervals on 0 points - always 0. No update needed.
 
     # Fill the middle
     for i in range(1, m + 1):
@@ -34,8 +33,7 @@ def find_best_interval(xs: ArrayLike, ys: ArrayLike, k: int) -> tuple[list[tuple
                 min_error = argmin(next_errors)
                 options.append((next_errors[min_error], (l, arange(l, i + 1)[min_error])))
 
-            min_index = argmin(opt[0] for opt in options)
-            E[i, j], P[i][j] = options[min_index]
+            E[i, j], P[i][j] = options[argmin([opt[0] for opt in options])]
 
     # Extract the best interval set and its error count
     best = []
@@ -46,7 +44,7 @@ def find_best_interval(xs: ArrayLike, ys: ArrayLike, k: int) -> tuple[list[tuple
         if cur == None:
             break
     best = sorted(best)
-    besterror: ndarray = E[m, k]
+    besterror = E[m, k]
 
     # Convert interval boundaries to numbers in [0,1]
     exs = concatenate([[0], xs, [1]])

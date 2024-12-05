@@ -18,6 +18,9 @@ class Tag(Enum):
     L2 = 3
     U2 = 4
 
+    def __repr__(self):
+        return self.name
+
 
 class State(Enum):
     InIn = 1
@@ -50,7 +53,10 @@ STATE_SWITCHER: dict[State, dict[Tag, State]] = {
     },
 }
 
+# note: if the intervals didn't start at 0.0 and didn't end at 1.0, we would have had to add 0-length intervals
+# for the merge to work correctly
 IN_INTERVALS = [(0.0, 0.2), (0.4, 0.6), (0.8, 1.0)]
+IN_INTERVALS_NP = np.array([(0.0, 0.2), (0.4, 0.6), (0.8, 1.0)], dtype=[('l', 'f4'), ('u', 'f4')])
 
 _IN_IN_PROB = 0.8
 _OUT_IN_PROB = 0.1
@@ -72,10 +78,10 @@ class Assignment2(object):
         Returns: np.ndarray of shape (m,2):
                 A two-dimensional array of size m that contains the pairs where drawn from the distribution P.
         """
-        x_samples = np.random.uniform(0, 1, 2 * m)  # 2m values which are sampled IID over [0, 1]
+        x_samples = np.random.uniform(0, 1, m)  # m values which are sampled IID over [0, 1]
         x_samples.sort()
         tag_per_sample = np.vectorize(self.is_in_intervals)(x_samples)
-        labels = np.random.binomial(1, p=np.where(tag_per_sample, 0.8, 0.1))
+        labels = np.random.binomial(1, p=np.where(tag_per_sample, _IN_IN_PROB, _OUT_IN_PROB))
         result = np.column_stack((x_samples, labels))
         return result
 
@@ -100,9 +106,14 @@ class Assignment2(object):
 
         for n in n_values:
             sample = self.sample_from_D(n)
-            result = find_best_interval(sample[:, 0], sample[:, 1], k)
-            empirical_errs.append(self.calc_empirical_error(result))
-            true_errs.append(self.calc_true_error(result))
+            intervals, error_cnt = find_best_interval(sample[:, 0], sample[:, 1], k)
+            empirical_errs.append(error_cnt / n)
+            print(intervals)
+            intervals = [(float(x[0]), float(x[1])) for x in intervals]
+            true_errs.append(self.calc_true_error(intervals))
+
+        print(true_errs)
+        print(empirical_errs)
 
         plt.plot(n_values, empirical_errs, label='Empirical Error')
         plt.plot(n_values, true_errs, label='True Error')
@@ -159,7 +170,7 @@ class Assignment2(object):
     # Place for additional methods
 
     @staticmethod
-    def merge_intervals(list1: Intervals, list2: Intervals) -> Points:
+    def merge_intervals(true_intervals: Intervals, intervals: Intervals) -> Points:
         """
         Merges two sorted lists into a single sorted list.
         """
@@ -168,33 +179,41 @@ class Assignment2(object):
         i_loc, j_loc = 0, 0
 
         # Merge elements from both lists until one is exhausted
-        while i < len(list1) and j < len(list2):
-            if list1[i][i_loc] < list2[j][j_loc]:
+        while i < len(true_intervals) and j < len(intervals):
+            if true_intervals[i][i_loc] < intervals[j][j_loc]:
                 if i_loc == 0:  # move to the next index in the same interval
-                    merged.append((list1[i][i_loc], Tag.L1))
+                    merged.append((true_intervals[i][i_loc], Tag.L1))
                     i_loc = 1
                 else:  # move to the next interval
-                    merged.append((list1[i][i_loc], Tag.U1))
+                    merged.append((true_intervals[i][i_loc], Tag.U1))
                     i += 1
                     i_loc = 0
             else:
                 if j_loc == 0:  # move to the next index in the same interval
-                    merged.append((list2[j][j_loc], Tag.L2))
+                    merged.append((intervals[j][j_loc], Tag.L2))
                     j_loc = 1
                 else:  # move to the next interval
-                    merged.append((list2[j][j_loc], Tag.U2))
+                    merged.append((intervals[j][j_loc], Tag.U2))
                     j += 1
                     j_loc = 0
 
         # Append any remaining elements from list1
-        for interval in list1[i:]:
-            merged.append((interval[0], Tag.L1))
-            merged.append((interval[1], Tag.U1))
+        if i < len(true_intervals):
+            if i_loc == 1:
+                merged.append((true_intervals[i][1], Tag.U1))
+                i += 1
+            for interval in true_intervals[i:]:
+                merged.append((interval[0], Tag.L1))
+                merged.append((interval[1], Tag.U1))
 
         # Append any remaining elements from list2
-        for interval in list2[j:]:
-            merged.append((interval[0], Tag.L2))
-            merged.append((interval[1], Tag.U2))
+        if j < len(intervals):
+            if j_loc == 1:
+                merged.append((intervals[j][1], Tag.U2))
+                j += 1
+            for interval in intervals[j:]:
+                merged.append((interval[0], Tag.L2))
+                merged.append((interval[1], Tag.U2))
 
         return merged
 
@@ -215,18 +234,15 @@ class Assignment2(object):
             State.OutOut: [],
         }
 
-        sorted_tagged_intervals = self.merge_intervals(intervals, true_intervals)
-        if sorted_tagged_intervals[0] != 0.0:
-            sorted_tagged_intervals.insert(0, (0.0, Tag.U1))
-        if sorted_tagged_intervals[-1] != 1.0:
-            sorted_tagged_intervals.append((1.0, Tag.L1))
+        sorted_tagged_points = self.merge_intervals(true_intervals, intervals)
 
-        prev, prev_tag = sorted_tagged_intervals[0]
+        prev, prev_tag = 0.0, Tag.U1
         state: State = State.OutOut
 
-        for curr, curr_tag in sorted_tagged_intervals[1:]:
+        for curr, curr_tag in sorted_tagged_points:
             states_to_intervals[state].append((prev, curr))
             state = STATE_SWITCHER[state][curr_tag]
+            prev, prev_tag = curr, curr_tag
 
         return states_to_intervals
 
@@ -236,23 +252,18 @@ class Assignment2(object):
         Calculates the true error of the given intervals, based on the "true intervals".
         """
         states_to_intervals = self.tag_intervals(intervals, true_intervals)
-        states_to_length = {state: sum([u - l for u, l in intervals]) for state, intervals in
+        states_to_length = {state: sum([u - l for l, u in intervals]) for state, intervals in
                             states_to_intervals.items()}
 
         true_error = sum(STATE_TO_PROB[state] * states_to_length[state] for state in State)
         return true_error
 
-    def calc_empirical_error(self, hypothesis, ):
-        pass
+    # def calc_empirical_error(self, hypothesis, ):
+    #    pass
 
     @staticmethod
-    def is_in_intervals(x: float, intervals: Intervals = tuple(IN_INTERVALS)) -> bool:
-        for interval in intervals:
-            if x > interval[0]:
-                return False
-            if x <= interval[1]:
-                return True
-        return False
+    def is_in_intervals(x: float, intervals: np.array = IN_INTERVALS_NP) -> bool:
+        return np.any((x >= intervals['l']) & (x <= intervals['u']))
 
 
 #################################
